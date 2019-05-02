@@ -16,7 +16,9 @@ var download = function(uri, filename, callback) {
 };
 
 function zpad(number, digits) {
-    return Array(Math.max(digits - String(number).length + 1, 0)).join(0) + number;
+  return (
+    Array(Math.max(digits - String(number).length + 1, 0)).join(0) + number
+  );
 }
 
 const URL_FORMAT = /^(https?:\/\/hentaifox\.com\/gallery\/(\d+)\/?)/;
@@ -75,6 +77,10 @@ console.log('Manga id:' + mangaID);
     'utf8'
   );
 
+  const namePath = path.join(__dirname, 'manga', '.name');
+  if (!fs.existsSync(namePath)) fs.mkdirSync(namePath, { recursive: true });
+  fs.symlinkSync('../' + mangaID, namePath + '/' + title.replace(/[\/\\]/g, '').replace(/%20/g, "_").trim(), 'dir');
+
   const imagesURL =
     'https://' +
     IMAGES_URL.exec($('.cover > img:nth-child(1)').src.substr(2))[1] +
@@ -82,9 +88,9 @@ console.log('Manga id:' + mangaID);
   console.log(imagesURL);
 
   for (let i = 1; i <= mangaInfo.pageCount; i++) {
-    console.log('[' + i + '/' + pageCount + ']');
-    await new Promise(res =>
-      download(imagesURL + i + '.jpg', parentPath + '/' + zpad(i, String(pageCount).length) + '.jpg', res)
-    );
+    const imageP =
+      parentPath + '/' + zpad(i, String(pageCount).length) + '.jpg';
+    if (!fs.existsSync(imageP))
+      await new Promise(res => download(imagesURL + i + '.jpg', imageP, res));
   }
 })();
