@@ -1,96 +1,94 @@
-const fetch = require('node-fetch');
-const { JSDOM } = require('jsdom');
+const {
+  parseArgs,
+  getGalleryPage,
+  getGalleryPageInfo,
+  downloadPages
+} = require('./src/lib');
+
 const fs = require('fs');
-const request = require('request');
 const path = require('path');
+const crypto = require('crypto');
 
-var download = function(uri, filename, callback) {
-  request.head(uri, function(err, res, body) {
-    console.log('content-type:', res.headers['content-type']);
-    console.log('content-length:', res.headers['content-length']);
+// GLOBALS
+const TMP_DIR = process.cwd();
+const DOWNLOAD_DIR = path.join(process.cwd(), 'manga');
+const LINK_DIR = path.join(DOWNLOAD_DIR, '.name');
 
-    request(uri)
-      .pipe(fs.createWriteStream(filename))
-      .on('close', callback);
-  });
-};
-
-function zpad(number, digits) {
-  return (
-    Array(Math.max(digits - String(number).length + 1, 0)).join(0) + number
-  );
-}
-
-const URL_FORMAT = /^(https?:\/\/hentaifox\.com\/gallery\/(\d+)\/?)/;
-const IMAGES_URL = /^([\d\w\.-]+\/\d+\/\d+)\/?/;
+//
+// Parse Args
+//
 
 const args = require('minimist')(process.argv.slice(2));
-console.log(args);
+console.log(args._);
 
-if (args._.length == 0) {
-  // Help
-  return console.log(`<url>`);
-}
+const { mangaId } = parseArgs(args._);
+console.log('Manga Id:', mangaId);
 
-const url = args._[0];
-console.log('Scraping: ' + url);
+const downloadDirPath = path.join(DOWNLOAD_DIR, mangaId);
 
-const urlMatch = URL_FORMAT.exec(url);
-if (!urlMatch) return console.log('Invalid URL');
-const mangaID = urlMatch[2];
-const fetchURL = urlMatch[1];
-
-console.log('Manga id:' + mangaID);
+// Test existance
+if (fs.existsSync(downloadDirPath)) throw new Error('Manga allready exists');
 
 (async () => {
-  console.log('Fetching page...');
-  const page = new JSDOM(await (await fetch(fetchURL)).text());
-  const $ = selector => page.window.document.querySelector(selector);
-  const $$ = selector => page.window.document.querySelectorAll(selector);
+  //
+  // Get Manga Info
+  //
 
-  // Get Info
-  const title = $('div.info > h1').textContent;
-  const characters = $('div.info span.characters').textContent.substr(10);
-  const tags = $('div.info span.artists:nth-child(4)')
-    .textContent.substr(6)
-    .split(', ');
-  const artists = $('div.info span.artists:nth-child(5)')
-    .textContent.substr(9)
-    .split(', ');
-  const pageCount = parseInt($('.pages').textContent.substr(7));
+  console.log('Fetching page ...');
+  const page = await getGalleryPage(mangaId);
+  console.log('Got Page!');
 
-  const mangaInfo = {
-    title,
-    characters,
-    tags,
-    artists,
-    pageCount
-  };
-  console.log('Manga info: ');
-  console.log(mangaInfo);
+  const info = getGalleryPageInfo(page, mangaId);
+  console.log('Manga info:', info);
 
-  const parentPath = path.join(__dirname, 'manga', mangaID);
-  if (!fs.existsSync(parentPath)) fs.mkdirSync(parentPath, { recursive: true });
+  //
+  // Save Info
+  //
+
+  const tmpDir = path.join(
+    TMP_DIR,
+    '.tmp.' +
+      crypto
+        .randomBytes(20)
+        .toString('base64')
+        .replace(/\//g, '-')
+  );
+
+  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+
   fs.writeFileSync(
-    parentPath + '/info.json',
-    JSON.stringify(mangaInfo, null, 2),
+    tmpDir + '/info.json',
+    JSON.stringify(info, null, 2),
     'utf8'
   );
 
-  const namePath = path.join(__dirname, 'manga', '.name');
-  if (!fs.existsSync(namePath)) fs.mkdirSync(namePath, { recursive: true });
-  fs.symlinkSync('../' + mangaID, namePath + '/' + title.replace(/[\/\\]/g, '').replace(/%20/g, "_").trim(), 'dir');
+  //
+  // Download
+  //
 
-  const imagesURL =
-    'https://' +
-    IMAGES_URL.exec($('.cover > img:nth-child(1)').src.substr(2))[1] +
-    '/';
-  console.log(imagesURL);
+  await downloadPages(info, tmpDir);
 
-  for (let i = 1; i <= mangaInfo.pageCount; i++) {
-    const imageP =
-      parentPath + '/' + zpad(i, String(pageCount).length) + '.jpg';
-    if (!fs.existsSync(imageP))
-      await new Promise(res => download(imagesURL + i + '.jpg', imageP, res));
-  }
+  //
+  // Move
+  //
+
+  if (!fs.existsSync(DOWNLOAD_DIR))
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+
+  fs.renameSync(tmpDir, downloadDirPath);
+
+  //
+  // System Link
+  //
+
+  const linkDirName = info.title
+    .replace(/[\/\\]/g, '')
+    .replace(/%20/g, '_')
+    .trim();
+  const linkPath = path.join(LINK_DIR, linkDirName);
+
+  if (!fs.existsSync(LINK_DIR)) fs.mkdirSync(LINK_DIR, { recursive: true });
+
+  if (fs.existsSync(linkPath)) throw new Error('Link already exists');
+  fs.symlinkSync(path.relative(LINK_DIR, downloadDirPath), linkPath, 'dir');
 })();
