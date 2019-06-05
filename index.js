@@ -4,15 +4,36 @@ const {
   getGalleryPageInfo,
   downloadPages
 } = require('./src/lib');
+const {
+  rmR,
+  zpad
+} = require('./src/util');
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Detect Ctrl-C
+process.on('SIGINT', function () {
+  console.log("Caught interrupt signal");
+  process.exit();
+});
+
+const now = ((d) => d.getFullYear() + "-" + zpad(d.getMonth() + 1, 2) + "-" + zpad(d.getDay() + 1, 2))(new Date());
+const fileCount = async (folderPath) => new Promise((res, rej) => {
+  fs.readdir(folderPath, (err, files) => {
+    if (err) return rej(err);
+    res(files.length);
+  })
+});
+
+
 // GLOBALS
-const TMP_DIR = process.cwd();
-const DOWNLOAD_DIR = path.join(process.cwd(), 'manga');
-const LINK_DIR = path.join(DOWNLOAD_DIR, '.name');
+const CONTAINER_DIR = process.env.MANGA_DIR || process.cwd() + "/manga";
+
+const TMP_DIR = CONTAINER_DIR;
+const DOWNLOAD_DIR = path.join(CONTAINER_DIR, '.data');
+const LINK_DIR = path.join(CONTAINER_DIR, `${now}`);
 
 //
 // Parse Args
@@ -24,10 +45,20 @@ console.log(args._);
 const { mangaId } = parseArgs(args._);
 console.log('Manga Id:', mangaId);
 
-const downloadDirPath = path.join(DOWNLOAD_DIR, mangaId);
+const downloadDirPath = path.join(DOWNLOAD_DIR, String(Math.floor(mangaId / 1000)), String(mangaId % 1000));
 
 // Test existance
 if (fs.existsSync(downloadDirPath)) throw new Error('Manga allready exists');
+
+// Manga lock - Prevent 2 of the same downloads at the same time
+let done = false;
+fs.mkdirSync(downloadDirPath, { recursive: true });
+process.on('exit', function (code) {
+  if (!done) {
+    console.log("Removing folder lock")
+    rmR(downloadDirPath);
+  }
+});
 
 (async () => {
   //
@@ -48,13 +79,19 @@ if (fs.existsSync(downloadDirPath)) throw new Error('Manga allready exists');
   const tmpDir = path.join(
     TMP_DIR,
     '.tmp.' +
-      crypto
-        .randomBytes(20)
-        .toString('base64')
-        .replace(/\//g, '-')
+    crypto
+      .randomBytes(20)
+      .toString('base64')
+      .replace(/\//g, '-')
   );
 
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+  process.on('exit', function (code) { // Exit remove hook
+    if (fs.existsSync(tmpDir)) {
+      console.log("Deleting unfinished manga");
+      rmR(tmpDir);
+    }
+  });
 
   fs.writeFileSync(
     tmpDir + '/info.json',
@@ -91,4 +128,7 @@ if (fs.existsSync(downloadDirPath)) throw new Error('Manga allready exists');
 
   if (fs.existsSync(linkPath)) throw new Error('Link already exists');
   fs.symlinkSync(path.relative(LINK_DIR, downloadDirPath), linkPath, 'dir');
+
+  // Finish
+  done = true;
 })();

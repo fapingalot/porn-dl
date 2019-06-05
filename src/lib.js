@@ -4,6 +4,8 @@ const { JSDOM: _JSDOM } = require('jsdom');
 const _fs = require('fs');
 const { download: _download } = require('./util');
 
+const { PromisePool } = require('./pool');
+
 // Parse
 const _ = require('lodash');
 const path = require('path');
@@ -101,15 +103,21 @@ const getGalleryPageInfo = (page, mangaId) => {
 };
 
 const downloadPages = async (info, dir, download = _download, fs = _fs) => {
-  for (let i = 1; i <= info.pageCount; i++) {
-    const fileName = zpad(i, String(info.pageCount).length) + '.jpg';
-    const filePath = path.join(dir, fileName);
+  let i = 0;
+  return (new PromisePool(() => {
+    while (i < info.pageCount) {
+      i++;
 
-    if (!fs.existsSync(filePath)) {
-      console.log(`[${i}/${info.pageCount}]`);
-      await download(`https://${info.imageBaseURL}/${i}.jpg`, filePath);
+      const fileName = zpad(i, String(info.pageCount).length) + '.jpg';
+      const filePath = path.join(dir, fileName);
+
+      if (!fs.existsSync(filePath)) {
+        console.log(`[${i}/${info.pageCount}]`);
+        return download(`https://${info.imageBaseURL}/${i}.jpg`, filePath);
+      }
     }
-  }
+    return null;
+  })).start();
 };
 
 // Exports

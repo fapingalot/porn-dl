@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js $(xclip -o)",
+    "bulk": "for n in $( xclip -selection c -o | grep https://hentaifox.com/g ); do node index.js $n; done",
     "test": "jest --verbose",
     "coverage": "jest --coverage"
   },
