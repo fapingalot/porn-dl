@@ -11,6 +11,7 @@ const {
 
 const fs = require('fs');
 const path = require('path');
+const fsE = require('fs-extra');
 const crypto = require('crypto');
 
 // Detect Ctrl-C
@@ -31,7 +32,7 @@ const fileCount = async (folderPath) => new Promise((res, rej) => {
 // GLOBALS
 const CONTAINER_DIR = process.env.MANGA_DIR || process.cwd() + "/manga";
 
-const TMP_DIR = CONTAINER_DIR;
+const TMP_DIR = require('os').tmpdir();
 const DOWNLOAD_DIR = path.join(CONTAINER_DIR, '.data');
 const LINK_DIR = path.join(CONTAINER_DIR, `${now}`);
 
@@ -45,10 +46,28 @@ console.log(args._);
 const { mangaId } = parseArgs(args._);
 console.log('Manga Id:', mangaId);
 
-const downloadDirPath = path.join(DOWNLOAD_DIR, String(Math.floor(mangaId / 1000)), String(mangaId % 1000));
+const downloadDirPath = path.join(DOWNLOAD_DIR, String(Math.floor(mangaId / 1000)), mangaId);
+console.log("Saving to: " + downloadDirPath);
+
+
+const makeLink = (info) => {
+  const linkDirName = info.title
+    .replace(/[\/\\]/g, '')
+    .replace(/%20/g, '_')
+    .trim();
+  const linkPath = path.join(LINK_DIR, linkDirName);
+
+  if (!fs.existsSync(LINK_DIR)) fs.mkdirSync(LINK_DIR, { recursive: true });
+
+  if (fs.existsSync(linkPath)) throw new Error('Link already exists');
+  fs.symlinkSync(path.relative(LINK_DIR, downloadDirPath), linkPath, 'dir');
+};
 
 // Test existance
-if (fs.existsSync(downloadDirPath)) throw new Error('Manga allready exists');
+if (fs.existsSync(downloadDirPath)) {
+  // makeLink(require(downloadDirPath + "/info.json"));
+  throw new Error('Manga allready exists');
+}
 
 // Manga lock - Prevent 2 of the same downloads at the same time
 let done = false;
@@ -76,9 +95,8 @@ process.on('exit', function (code) {
   // Save Info
   //
 
-  const tmpDir = path.join(
-    TMP_DIR,
-    '.tmp.' +
+  const tmpDir = path.join(TMP_DIR,
+    "HF-TMP-" +
     crypto
       .randomBytes(20)
       .toString('base64')
@@ -112,23 +130,14 @@ process.on('exit', function (code) {
   if (!fs.existsSync(DOWNLOAD_DIR))
     fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
-  fs.renameSync(tmpDir, downloadDirPath);
+  fsE.moveSync(tmpDir, downloadDirPath, { overwrite: true });
+
+  // Finish
+  done = true;
 
   //
   // System Link
   //
 
-  const linkDirName = info.title
-    .replace(/[\/\\]/g, '')
-    .replace(/%20/g, '_')
-    .trim();
-  const linkPath = path.join(LINK_DIR, linkDirName);
-
-  if (!fs.existsSync(LINK_DIR)) fs.mkdirSync(LINK_DIR, { recursive: true });
-
-  if (fs.existsSync(linkPath)) throw new Error('Link already exists');
-  fs.symlinkSync(path.relative(LINK_DIR, downloadDirPath), linkPath, 'dir');
-
-  // Finish
-  done = true;
+  makeLink(info);
 })();
