@@ -12,6 +12,12 @@ process.on('SIGINT', () => {
     process.exit();
 });
 
+// Detect Error
+process.on('uncaughtException', (err) => {
+    console.error('There was an uncaught error', err);
+    process.exit();
+});
+
 const now = dateToString();
 
 // GLOBALS

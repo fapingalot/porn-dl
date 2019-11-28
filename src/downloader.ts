@@ -18,80 +18,45 @@ const nextExtension = (url: string) => {
     }
 };
 
-export const downloadMangaNew = async (manga: Manga, downloadPath: string, ariaOptions: Aria2Options = {}) => {
-    //
-    // TODO Que
-    //
-
-    const toDO: { [gid: string]: boolean } = {};
-    const tryPNG: { [gid: string]: { url: string, out: string } } = {};
-
-    //
-    // New connection
-    //
-
-    const aria2 = new Aria2(ariaOptions);
-    await aria2.open();
-
-    //
-    //
-    //
-
-    let error = false;
-    await new Promise<void>(async (res, rej) => {
-        const pages = manga.getPageURLs();
-
-        // Create Download data
-        const callJPG = pages
-            .map((url, i) =>
-                ({ url, out: pageDistPath(i, manga.info.pageCount, url.substr(url.lastIndexOf('.') + 1)) }),
-            )
-            .map(({ url, out }) => ['addUri', [url], { dir: downloadPath, out }] as Aria2Call);
-
-        // Start download
-        await Promise.all((await aria2.batch(callJPG)).map((p, i) => p.then((gid) => {
-            toDO[gid] = true; // Add to que
-            // Add fail fallback
-            tryPNG[gid] = {
-                url: nextExtension(callJPG[i][1][0]),
-                out: nextExtension(callJPG[i][2].out),
-            };
-        })));
-
-        // Handle completes
-        aria2.on('onDownloadComplete', ([{ gid }]) => {
-            if (toDO[gid]) { delete toDO[gid]; }
-            if (tryPNG[gid]) { delete tryPNG[gid]; }
-
-            if (_.isEmpty(toDO)) { res(); }
-        });
-
-        // Handle errors
-        aria2.on('onDownloadError', ([{ gid }]) => {
-            if (toDO[gid]) { delete toDO[gid]; }
-            if (tryPNG[gid]) {
-                console.log('JPEG not found trying PNG');
-
-                aria2.call(
-                    'addUri',
-                    [tryPNG[gid].url],
-                    { dir: downloadPath, out: tryPNG[gid].out },
-                ).then((newGid) => {
-                    toDO[newGid] = true;
-                    delete tryPNG[newGid];
-                });
-            } else {
-                error = true;
-                console.log('Failed to download pic');
-            }
-            if (_.isEmpty(toDO)) { res(); }
-        });
+export const download = async (url: string, dir: string, out: string, aria2: Aria2) =>
+    new Promise<void>(async (res, rej) => {
+        const downloadGid = await aria2.call('addUri', [url], { dir, out });
+        aria2.on('onDownloadComplete', ([{ gid }]) => { if (gid === downloadGid) { res(); } });
+        aria2.on('onDownloadError', ([{ gid }]) => { if (gid === downloadGid) { rej(); } });
     });
 
-    //
-    // Close on finish
-    //
-    await aria2.close();
+export const downloadMangaNew = async (manga: Manga, downloadPath: string, ariaOptions: Aria2Options = {}) => {
+    const aria2 = new Aria2(ariaOptions);
+    await aria2.open();
+    (aria2 as any).setMaxListeners(manga.info.pageCount * 2);
 
-    if (error) { throw Error('Failed to completely download manga'); }
+    await Promise.all(
+        manga.getPageURLs()
+            .map((picURL, i) =>
+                download(
+                    picURL,
+                    downloadPath,
+                    pageDistPath(
+                        i,
+                        manga.info.pageCount,
+                        picURL.substr(picURL.lastIndexOf('.') + 1),
+                    ),
+                    aria2,
+                ).catch(() => {
+                    console.log('Failed to download Original Downloading fallback');
+                    return download(
+                        nextExtension(picURL),
+                        downloadPath,
+                        pageDistPath(
+                            i,
+                            manga.info.pageCount,
+                            nextExtension(picURL.substr(picURL.lastIndexOf('.') + 1)),
+                        ),
+                        aria2,
+                    );
+                }).catch(() => console.log(`Failed to download '${picURL}'`)),
+            ),
+    );
+
+    await aria2.close();
 };
