@@ -9,13 +9,17 @@
     "bulk": "for n in $( xclip -selection c -o | grep https://hentaifox.com/g ); do ts-node src/index.js $n; done",
     "test": "jest --verbose",
     "coverage": "jest --coverage",
-    "start:demon": "aria2c --enable-rpc --rpc-listen-all"
+    "start:demon": "aria2c --enable-rpc --rpc-listen-all",
+    "start:server": "concurrently --kill-others \"npm run start:demon\" \"ts-node src/server.ts\""
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "aria2": "^4.1.0",
+    "body-parser": "^1.19.0",
     "cheerio": "^1.0.0-rc.3",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
     "fs-extra": "^8.1.0",
     "jsdom": "^15.2.1",
     "lodash": "^4.17.15",
@@ -23,7 +27,10 @@
     "node-fetch": "^2.6.0"
   },
   "devDependencies": {
+    "@types/body-parser": "^1.17.1",
     "@types/cheerio": "^0.22.14",
+    "@types/cors": "^2.8.6",
+    "@types/express": "^4.17.2",
     "@types/fs-extra": "^8.0.1",
     "@types/jest": "^24.0.23",
     "@types/jsdom": "^12.2.4",
@@ -32,6 +39,7 @@
     "@types/node": "^12.12.12",
     "@types/node-fetch": "^2.5.4",
     "@types/request": "^2.48.3",
+    "concurrently": "^5.0.0",
     "jest": "^24.9.0",
     "ts-node": "^8.5.2",
     "tslint": "^5.20.1",

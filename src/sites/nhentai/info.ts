@@ -7,10 +7,10 @@ import fetch from 'node-fetch';
 //
 
 export const SELECTOR_MANGA_TITLE = '#info > h1';
-export const SELECTOR_MANGA_PAGE_COUNT = '#info > div:nth-child(4)';
+export const SELECTOR_MANGA_PAGE_COUNT = '#info > div';
 export const SELECTOR_MANGA_IMAGE_URL_BASE = '.cover > img:nth-child(1)';
 
-export const PAGE_COUNT_REGEX = /^(\d+)\s+pages$/;
+export const PAGE_COUNT_REGEX = /(\d+)\s+pages/;
 export const extractPageCount = (text: string): number | null => {
     const match = PAGE_COUNT_REGEX.exec(text);
     return (match && match[1]) ? parseInt(match[1], 10) : null;
