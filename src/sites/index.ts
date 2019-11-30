@@ -1,32 +1,129 @@
-import * as hentaifox from './hentaifox';
-import * as nhentai from './nhentai';
+//
+// Base Content
+//
 
-export type MangaType = 'hentaifox' | 'nhentai';
-export type Manga = hentaifox.Manga | nhentai.Manga;
-export type IMangaInfo = hentaifox.IMangaInfo | nhentai.IMangaInfo;
+export enum ContentType {
+    Manga = 'manga',
+    Picture = 'picture',
+    Video = 'video',
+    collection = 'collection',
+}
 
-export const getInfoFromURL = (url: string): { mangaId: string, mangaType: MangaType } | null => {
-    if (hentaifox.HENTAI_FOX_URL_REGEX.test(url)) {
-        return { mangaId: hentaifox.getIdFromURL(url), mangaType: 'hentaifox' };
-    }
-    if (nhentai.NHENTAI_URL_REGEX.test(url)) {
-        return { mangaId: nhentai.getIdFromURL(url), mangaType: 'nhentai' };
-    }
-    return null;
+export interface IContentExtra {
+    [key: string]: string[];
+}
+
+export interface IContent {
+    src: string;
+
+    type: ContentType;
+    id: string;
+    title: string;
+
+    contentURLs: string[][];
+
+    extra: IContentExtra;
+}
+
+//
+// Picture
+//
+
+export interface IPicture extends IContent {
+    type: ContentType.Picture;
+}
+
+//
+// Manga
+//
+
+export interface IMangaExtra extends IContentExtra {
+    parodies: string[];
+    characters: string[];
+    tags: string[];
+    artists: string[];
+    groups: string[];
+    languages: string[];
+    categories: string[];
+}
+
+export interface IManga extends IContent {
+    type: ContentType.Manga;
+
+    pageCount: number;
+
+    extra: IMangaExtra;
+}
+
+//
+// Video
+//
+
+export interface IVideo extends IContent {
+    type: ContentType.Video;
+}
+
+//
+// Content Source interface
+//
+
+export interface IContentGetter<Content extends IContent = IContent> {
+    /**
+     * The name of the site (** Probably the URL)
+     */
+    src: string;
+
+    getFromURL(url: string): Promise<Content>;
+    getFromId(id: string): Promise<Content>;
+
+    isValidURL(url: string): boolean;
+}
+
+//
+// URL to content
+//
+
+import directLink from './direct.link';
+import hentaiFox from './hentaifox.com';
+import konachan from './konachan.com';
+import nhentai from './nhentai.net';
+import rule34 from './rule34.xxx';
+import shadbase from './shadbase.com';
+import thatpervert from './thatpervert.com';
+import xlecx from './xlecx.com';
+
+export const CONTENT_PROVIDERS: IContentGetter[] = [
+    directLink,
+    hentaiFox,
+    konachan,
+    nhentai,
+    rule34,
+    shadbase,
+    thatpervert,
+    xlecx,
+];
+export type ContentProviderType = 'direct.link'
+    | 'hentaiFox'
+    | 'konachan.com'
+    | 'nhentai.net'
+    | 'rule34.xxx'
+    | 'shadbase.com'
+    | 'thatpervert.com'
+    | 'xlecx.com'
+    ;
+
+export const fetchContent = async (url: string): Promise<IContent> => {
+    const provider = CONTENT_PROVIDERS
+        .filter((pro) => pro.isValidURL(url))[0];
+    if (!provider) { throw new Error('No content provider is avaliable for this URL'); }
+
+    return provider.getFromURL(url);
 };
-export const parseMangaType = (type: string): MangaType | null => {
-    switch (type) {
-        case 'hentaifox': return 'hentaifox';
-        case 'nhentai': return 'nhentai';
-        default: return null;
-    }
-};
 
-export const fetchByID = (mangaID: string, type: MangaType): Promise<Manga> => {
-    switch (type) {
-        case 'hentaifox': return hentaifox.fetchByID(mangaID);
-        case 'nhentai': return nhentai.fetchByID(mangaID);
-    }
-};
+export const fetchContentByID = async (id: string, type: ContentProviderType): Promise<IContent> => {
+    const provider = CONTENT_PROVIDERS
+        .filter((pro) => pro.src === type)[0];
+    if (!provider) { throw new Error('No content provider is avaliable for this type'); }
 
-export { hentaifox, nhentai };
+    return provider.getFromId(id);
+};

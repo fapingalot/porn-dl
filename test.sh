@@ -1,0 +1,1 @@
+API_KEY=dfghrewert API_SECRET=sdfghjhgfhg ts-node src/server/environment

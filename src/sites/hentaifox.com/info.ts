@@ -1,6 +1,14 @@
 import cheerio from 'cheerio';
 import _ from 'lodash';
 import fetch from 'node-fetch';
+import { ContentType, IManga } from '..';
+
+//
+// Info
+//
+
+export const SRC = 'hentaifox.com';
+export type OContent = IManga;
 
 //
 // Base data
@@ -49,34 +57,19 @@ export const extractImageBaseURL = (text: string) =>
 // Info
 //
 
-export interface IMangaInfo {
-    mangaId: string;
-    title: string;
-    parodies: string[];
-    characters: string[];
-    tags: string[];
-    artists: string[];
-    groups: string[];
-    languages: string[];
-    categories: string[];
-    pageCount: number;
-
-    imageBaseURL: string;
-}
-
 export const genInfoURL = (mangaId: string) =>
     `https://hentaifox.com/gallery/${mangaId}/`;
 
-export const fetchByID = async (mangaId: string): Promise<IMangaInfo> =>
+export const fetchByID = async (mangaId: string): Promise<OContent> =>
     fetchByURL(genInfoURL(mangaId), mangaId);
 
-export const fetchByURL = async (url: string, mangaId: string): Promise<IMangaInfo> =>
+export const fetchByURL = async (url: string, mangaId: string): Promise<OContent> =>
     fromHTML(await (await fetch(url)).text(), mangaId);
 
 export const fromHTML = (html: string, mangaId: string) =>
     fromCheerioStatic(cheerio.load(html), mangaId);
 
-export const fromCheerioStatic = ($: CheerioStatic, mangaId: string): IMangaInfo => {
+export const fromCheerioStatic = ($: CheerioStatic, mangaId: string): OContent => {
     // Parse
     const title = $(SELECTOR_MANGA_TITLE).text();
     if (title.trim().length === 0) { throw new Error('Title is null'); }
@@ -97,19 +90,40 @@ export const fromCheerioStatic = ($: CheerioStatic, mangaId: string): IMangaInfo
 
     // TODO add code
     return {
-        mangaId,
+        src: SRC,
+
+        type: ContentType.Manga,
+        id: mangaId,
         title,
-        // tslint:disable-next-line: object-literal-sort-keys
+
         pageCount,
+        contentURLs: new Array(pageCount)
+            .fill(null)
+            .map((ignore, i) => [
+                'https://' + imageBaseURL + `/${i + 1}.jpg`,
+                'https://' + imageBaseURL + `/${i + 1}.png`,
+            ]),
 
-        parodies,
-        characters,
-        tags,
-        artists,
-        groups,
-        languages,
-        categories,
-
-        imageBaseURL,
+        extra: {
+            parodies,
+            characters,
+            tags,
+            artists,
+            groups,
+            languages,
+            categories,
+        },
     };
+};
+
+export const URL_REGEX = /^https?:\/\/hentaifox\.com\/(g|gallery)\/(\d+).*/i;
+export const getIdFromURL = (url: string): string => {
+    if (!_.isString(url)) { throw new Error('URL must be a String'); }
+
+    const match = URL_REGEX.exec(url);
+    if (!match) {
+        throw new Error('Invalid URL Format (eg. https://hentaifox.com/gallery/3838830/ )');
+    }
+
+    return match[2];
 };

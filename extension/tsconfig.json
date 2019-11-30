@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     // Src
-    "baseUrl": ".",
-    "moduleResolution": "node",
+    "baseUrl": "./",
+    "moduleResolution": "classic",
     "module": "commonjs",
 
     "esModuleInterop": true,
@@ -10,12 +10,16 @@
     "strictNullChecks": true,
 
     // Output
-    "target": "es6",
-    "outDir": "dist",
+    "target": "es5",
+    "outDir": "build",
     "sourceMap": true,
 
-    "typeRoots": ["./node_modules/@types", "./typings"]
+    "paths": {
+      "@app/*": ["src/*"]
+    },
+
+    "lib": ["dom", "esnext"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "typings"]
+  "files": ["types.d.ts"]
 }

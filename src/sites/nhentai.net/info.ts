@@ -1,6 +1,14 @@
 import cheerio from 'cheerio';
 import _ from 'lodash';
 import fetch from 'node-fetch';
+import { ContentType, IManga } from '..';
+
+//
+// Info
+//
+
+export const SRC = 'nhentai.net';
+export type OContent = IManga;
 
 //
 // Base data
@@ -61,34 +69,19 @@ export const extractImageBaseURL = (text: string) =>
 // Info
 //
 
-export interface IMangaInfo {
-    mangaId: string;
-    title: string;
-    parodies: string[];
-    characters: string[];
-    tags: string[];
-    artists: string[];
-    groups: string[];
-    languages: string[];
-    categories: string[];
-    pageCount: number;
-
-    pages: string[];
-}
-
 export const genInfoURL = (mangaId: string) =>
     `https://nhentai.net/g/${mangaId}/`;
 
-export const fetchByID = async (mangaId: string): Promise<IMangaInfo> =>
+export const fetchByID = async (mangaId: string): Promise<OContent> =>
     fetchByURL(genInfoURL(mangaId), mangaId);
 
-export const fetchByURL = async (url: string, mangaId: string): Promise<IMangaInfo> =>
+export const fetchByURL = async (url: string, mangaId: string): Promise<OContent> =>
     fromHTML(await (await fetch(url)).text(), mangaId);
 
 export const fromHTML = (html: string, mangaId: string) =>
     fromCheerioStatic(cheerio.load(html), mangaId);
 
-export const fromCheerioStatic = ($: CheerioStatic, mangaId: string): IMangaInfo => {
+export const fromCheerioStatic = ($: CheerioStatic, mangaId: string): OContent => {
     // Parse
     const title = $(SELECTOR_MANGA_TITLE).text().trim();
     if (title.length === 0) { throw new Error('Title is null'); }
@@ -102,25 +95,45 @@ export const fromCheerioStatic = ($: CheerioStatic, mangaId: string): IMangaInfo
                 .replace(/t\.png$/, '.png')
                 .replace(/t\.jpg$/, '.jpg')
                 .replace(/t\.gif$/, '.gif')
-                .replace(/^https?:\/\/t/, 'http://i'),
+                .replace(/^https:\/\/t/, 'https://i'),
         ).get();
 
     const tagsContainer = extractTagsFromPage($);
 
     return {
-        mangaId,
+        src: SRC,
+
+        type: ContentType.Manga,
+        id: mangaId,
         title,
-        // tslint:disable-next-line: object-literal-sort-keys
+
+        contentURLs: pages.map((page) => [page]),
         pageCount,
 
-        parodies: tagsContainer.parodies || [],
-        characters: tagsContainer.characters || [],
-        tags: tagsContainer.tags || [],
-        artists: tagsContainer.artists || [],
-        groups: tagsContainer.groups || [],
-        languages: tagsContainer.languages || [],
-        categories: tagsContainer.categories || [],
-
-        pages,
+        extra: {
+            parodies: tagsContainer.parodies || [],
+            characters: tagsContainer.characters || [],
+            tags: tagsContainer.tags || [],
+            artists: tagsContainer.artists || [],
+            groups: tagsContainer.groups || [],
+            languages: tagsContainer.languages || [],
+            categories: tagsContainer.categories || [],
+        },
     };
+};
+
+//
+// URL Helper
+//
+
+export const URL_REGEX = /^https?:\/\/nhentai\.net\/(g)\/(\d+).*/i;
+export const getIdFromURL = (url: string): string => {
+    if (!_.isString(url)) { throw new Error('URL must be a String'); }
+
+    const match = URL_REGEX.exec(url);
+    if (!match) {
+        throw new Error('Invalid URL Format (eg. https://nhentai.net/g/292230/ )');
+    }
+
+    return match[2];
 };
