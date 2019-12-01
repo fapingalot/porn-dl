@@ -1,3 +1,14 @@
+interface IConfig {
+  apiURL?: string;
+  apiKey?: string;
+  apiSecret?: string;
+
+  open?: boolean;
+  active?: boolean;
+}
+
+
+
 (() => {
   /**
    * Check and set a global guard variable.
@@ -25,37 +36,43 @@
       xhr.send(JSON.stringify(data));
     });
 
-  browser.browserAction.onClicked.addListener(() => {
-    browser.tabs
-      .query({})
-      .then(tabs =>
-        tabs
-          .filter(tab => tab.url && tab.url.startsWith('http'))
-          .filter(tab => tab.active)
-          .map(tab => ({ url: tab.url, open: true }))
-      )
-      .then(tabsData =>
-        tabsData.map(tab =>
-          loadJSON<{ success: boolean, name: string }[]>('http://localhost:8080', [tab]).then(data =>
-            data.forEach(({ success, name }) => {
-              if (success) {
-                browser.notifications.create({
-                  type: 'basic',
-                  iconUrl: 'icons/incon-48.png',
-                  title: 'Downloaded',
-                  message: name
-                });
-              } else {
-                browser.notifications.create({
-                  type: 'basic',
-                  iconUrl: 'icons/incon-48.png',
-                  title: 'Failed to download',
-                  message: name
-                });
-              }
-            })
-          )
-        )
-      );
+  const getConfig = () => browser.storage.local.get(['apiURL', 'apiKey', 'apiSecret', 'open', 'active']) as Promise<IConfig>;
+  const callAPI = (apiURL: string | undefined, data: any) => loadJSON<{ success: boolean, name: string }[]>(apiURL || 'http://localhost:8080', data);
+
+  browser.browserAction.onClicked.addListener(async () => {
+    const config = await getConfig();
+    console.log(config);
+
+    const tabsData = await browser.tabs.query({});
+    // console.log(tabsData);
+
+    const tabs = tabsData
+      .filter(tab => tab.url && tab.url.startsWith('http'))
+      .filter(tab => config.active ? tab.active : true)
+      .map((tab) => ({ url: tab.url, open: config.open }));
+    console.log(tabs);
+
+    tabs.forEach(async (tab) => {
+      const data = await callAPI(config.apiKey, [tab]);
+      data.forEach(({ success, name }) => {
+        if (success) {
+          // Success
+          browser.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/incon-48.png',
+            title: 'Downloaded',
+            message: name
+          });
+        } else {
+          // Failure
+          browser.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/incon-48.png',
+            title: 'Failed to download',
+            message: name
+          });
+        }
+      });
+    });
   });
 })();

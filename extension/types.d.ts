@@ -18,6 +18,19 @@ declare namespace browser {
             quality?: number;
         }
     }
+    namespace storage {
+        namespace local {
+            function get(key: null | string | object | string[]): Promise<any>;
+            function set(key: object): Promise<void>;
+        }
+
+        interface StorageChange {
+            oldValue?: any;
+            newValue?: any;
+        }
+
+        const onChanged: IListener<(changes: { [key: string]: StorageChange }, areaName: 'sync' | 'local' | 'managed') => void>
+    }
     namespace tabs {
         type MutedInfoReason = "capture" | "extension" | "user";
         interface MutedInfo {

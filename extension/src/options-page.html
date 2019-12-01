@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Document</title>
+  </head>
+  <body id="body">
+    <div>
+      API URL
+      <input type="text" id="apiURL" required/>
+    </div>
+    <div>
+      API Key <input type="password" value="" id="apiKey" minlength="8" />
+    </div>
+    <div>
+      API Secret <input type="password" value="" id="apiSecret" minlength="8" />
+    </div>
+    <div>Open when complete <input type="checkbox" id="open" /></div>
+    <div>Active tab <input type="checkbox" id="active" /></div>
+    <button id="saveButton">Save</button>
+    <button id="resetButton">Reset</button>
+
+    <script src="options-page.js"></script>
+  </body>
+</html>

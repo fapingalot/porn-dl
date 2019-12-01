@@ -7,7 +7,7 @@ export const zpad = (val: number, pad: number) => {
 };
 
 export const dateToString = (date = new Date()) =>
-    `${date.getFullYear()}-${zpad(date.getMonth(), 2)}-${zpad(date.getDay(), 2)}`;
+    `${date.getFullYear()}-${zpad(date.getMonth() + 1, 2)}-${zpad(date.getDay() + 1, 2)}`;
 
 export const UUID = () =>
     crypto.randomBytes(20).toString('base64')
